@@ -50,6 +50,15 @@ public class JwtService {
     }
 
     /**
+     * Extraer el id del usuario a partir de los claims
+     * @param claims claims del token
+     * @return id del usuario
+     */
+    public Integer idUsuario(Claims claims) {
+        return claims.get(props.claim().user(), Integer.class);
+    }
+
+    /**
      * Validar token y extraer claims
      * @param token token JWT
      * @return claims del token
