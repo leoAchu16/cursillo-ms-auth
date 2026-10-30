@@ -1,4 +1,4 @@
-package org.cursillo.cursillomsauth;
+package org.cursillo.auth;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
