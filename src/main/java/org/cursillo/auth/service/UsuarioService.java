@@ -11,6 +11,9 @@ import org.cursillo.commons.dto.RegistroRequestDTO;
 import org.cursillo.commons.dto.UsuarioRequestDTO;
 import org.cursillo.commons.dto.UsuarioResponseDTO;
 import org.cursillo.commons.entities.Enums.Rol;
+import org.cursillo.commons.entities.Usuarios.Alumno;
+import org.cursillo.commons.entities.Usuarios.Profesor;
+import org.cursillo.commons.entities.Usuarios.Secretaria;
 import org.cursillo.commons.entities.Usuarios.Usuario;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -101,17 +104,30 @@ public class UsuarioService {
 
 
     /**
-     * Obtiene una lista de usuarios activos con paginación.
+     * Obtiene una lista de usuarios activos con paginación, opcionalmente filtrada por rol.
+     *
+     * @param rolDto rol para filtrar (opcional, usando la ruta completa del DTO)
      * @param pageable información de paginación
      * @return Page con los usuarios activos
      */
     @Transactional(readOnly = true)
-    public Page<UsuarioResponseDTO> listar(Pageable pageable) {
-        log.debug("Listando usuarios activos con paginacion");
+    public Page<UsuarioResponseDTO> listarUsuarios(org.cursillo.commons.dto.Rol rolDto, Pageable pageable) {
+        log.debug("Listando usuarios activos con paginacion. Filtro rol: {}", rolDto);
+
+        if (rolDto != null) {
+            Class<? extends Usuario> tipo = switch (rolDto) {
+                case ALUMNO -> Alumno.class;
+                case PROFESOR -> Profesor.class;
+                case SECRETARIA -> Secretaria.class;
+            };
+
+            return usuarioRepo.findAllByActivoTrueAndTipo(tipo, pageable)
+                    .map(usuarioMapper::toDto);
+        }
+
         return usuarioRepo.findAllByActivoTrue(pageable).map(usuarioMapper::toDto);
     }
-
-
+    
     /**
      * Eliminación lógica de un usuario. Se marca como inactivo.
      * @param id id del usuario a eliminar
