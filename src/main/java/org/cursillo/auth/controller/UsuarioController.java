@@ -19,36 +19,39 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/usuarios")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('SECRETARIA')")
 public class UsuarioController {
 
     private final UsuarioService service;
 
+    @PreAuthorize("hasRole('SECRETARIA')")
     @PostMapping
     public ResponseEntity<UsuarioResponseDTO> create(@RequestBody @Valid UsuarioRequestDTO dto) {
         log.info("POST /usuarios - creando usuario");
         return ResponseEntity.status(HttpStatus.CREATED).body(service.crearProfesor(dto));
     }
 
+    @PreAuthorize("hasAnyRole('SECRETARIA', 'PROFESOR', 'ALUMNO')")
     @PutMapping("/{id}")
     public ResponseEntity<UsuarioResponseDTO> update(@PathVariable("id") Integer idUsuario, @RequestBody @Valid UsuarioRequestDTO dto) {
         log.info("PUT /usuarios/{} - actualizando usuario", idUsuario);
         return ResponseEntity.ok(service.actualizar(idUsuario, dto));
     }
-
+    @PreAuthorize("hasAnyRole('SECRETARIA', 'PROFESOR', 'ALUMNO')")
     @GetMapping("/{id}")
     public ResponseEntity<UsuarioResponseDTO> getById(@PathVariable("id") Integer idUsuario) {
         log.info("GET /usuarios/{} - obteniendo usuario", idUsuario);
         return ResponseEntity.ok(service.obtenerPorId(idUsuario));
     }
 
+    @PreAuthorize("hasAnyRole('SECRETARIA', 'PROFESOR', 'ALUMNO')")
     @GetMapping
-    public ResponseEntity<Page<UsuarioResponseDTO>> getAll(@ParameterObject Pageable pageable) {
+    public ResponseEntity<Page<UsuarioResponseDTO>> getAll(@RequestParam(value = "rol", required = false) Rol rol, @ParameterObject Pageable pageable) {
         log.info("GET /usuarios - listando usuarios (pagina: {}, tamanho: {})",
                 pageable.getPageNumber(), pageable.getPageSize());
-        return ResponseEntity.ok(service.listar(pageable));
+        return ResponseEntity.ok(service.listarUsuarios(rol, pageable));
     }
 
+    @PreAuthorize("hasRole('SECRETARIA')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable("id") Integer idUsuario) {
         log.info("DELETE /usuarios/{} - eliminando usuario", idUsuario);
@@ -56,6 +59,7 @@ public class UsuarioController {
         return ResponseEntity.noContent().build();
     }
 
+    @PreAuthorize("hasRole('SECRETARIA')")
     @PostMapping("/{id}/roles/{rol}")
     public ResponseEntity<UsuarioResponseDTO> addRol(@PathVariable("id") Integer idUsuario,
                                                      @PathVariable("rol") Rol rol) {
@@ -63,6 +67,7 @@ public class UsuarioController {
         return ResponseEntity.ok(service.agregarRol(idUsuario, rol));
     }
 
+    @PreAuthorize("hasRole('SECRETARIA')")
     @DeleteMapping("/{id}/roles/{rol}")
     public ResponseEntity<UsuarioResponseDTO> removeRol(@PathVariable("id") Integer idUsuario,
                                                         @PathVariable("rol") Rol rol) {
