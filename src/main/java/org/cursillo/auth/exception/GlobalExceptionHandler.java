@@ -46,6 +46,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
+    // Rechazos de @PreAuthorize (clase de Spring Security, distinta de la AccessDeniedException propia):
+    // sin este handler caerían en handleGeneric y responderían 500
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleSpringAccessDenied(
+            org.springframework.security.access.AccessDeniedException ex) {
+        log.warn("Acceso denegado por rol: {}", ex.getMessage());
+        return buildResponse(HttpStatus.FORBIDDEN, "No tenés permisos para realizar esta acción.");
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex) {
         log.error("Error no controlado: ", ex);
