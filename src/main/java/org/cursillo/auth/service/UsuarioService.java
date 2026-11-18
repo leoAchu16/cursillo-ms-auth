@@ -2,7 +2,9 @@ package org.cursillo.auth.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.cursillo.auth.exception.AccessDeniedException;
 import org.cursillo.auth.exception.BadRequestException;
+import org.cursillo.auth.security.UsuarioActual;
 import org.cursillo.auth.exception.BusinessException;
 import org.cursillo.auth.exception.NotFoundException;
 import org.cursillo.auth.mapper.UsuarioMapper;
@@ -36,6 +38,7 @@ public class UsuarioService {
     private final UsuarioRepository usuarioRepo;
     private final UsuarioMapper usuarioMapper;
     private final PasswordEncoder passwordEncoder;
+    private final UsuarioActual usuarioActual;
 
 
     @Transactional
@@ -62,6 +65,12 @@ public class UsuarioService {
     @Transactional
     public UsuarioResponseDTO actualizar(Integer id, UsuarioRequestDTO dto) {
         log.debug("Actualizando usuario con id {}", id);
+
+        // Solo la secretaria edita a cualquiera; el resto únicamente a sí mismo
+        boolean esSecretaria = usuarioActual.esSecretaria();
+        if (!esSecretaria && !usuarioActual.esElMismo(id))
+            throw new AccessDeniedException("Solo podés editar tus propios datos.");
+
         validarDatos(dto, false);
 
         Usuario existente = usuarioRepo.findByIdUsuarioAndActivoTrue(id)
@@ -83,9 +92,13 @@ public class UsuarioService {
         if (dto.getContrasenha() != null && !dto.getContrasenha().isBlank())
             existente.setContrasenha(passwordEncoder.encode(dto.getContrasenha()));
 
-        existente.getRolesAdicionales().clear();
-        existente.getRolesAdicionales()
-                .addAll(adicionalesSinRepetir(existente, temporal.getRolesAdicionales()));
+        // Los roles adicionales solo los cambia la secretaria. Si no, un alumno podría
+        // editarse a sí mismo y agregarse el rol PROFESOR: se ignoran los del body.
+        if (esSecretaria) {
+            existente.getRolesAdicionales().clear();
+            existente.getRolesAdicionales()
+                    .addAll(adicionalesSinRepetir(existente, temporal.getRolesAdicionales()));
+        }
 
         return usuarioMapper.toDto(usuarioRepo.save(existente));
     }
