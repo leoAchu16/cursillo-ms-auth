@@ -104,15 +104,17 @@ public class UsuarioService {
 
 
     /**
-     * Obtiene una lista de usuarios activos con paginación, opcionalmente filtrada por rol.
+     * Obtiene una lista de usuarios activos con paginación, opcionalmente filtrada por rol y nombre.
      *
      * @param rolDto rol para filtrar (opcional, usando la ruta completa del DTO)
+     * @param nombre texto a buscar dentro del nombre (opcional, sin distinguir mayúsculas)
      * @param pageable información de paginación
      * @return Page con los usuarios activos
      */
     @Transactional(readOnly = true)
-    public Page<UsuarioResponseDTO> listarUsuarios(org.cursillo.commons.dto.Rol rolDto, Pageable pageable) {
-        log.debug("Listando usuarios activos con paginacion. Filtro rol: {}", rolDto);
+    public Page<UsuarioResponseDTO> listarUsuarios(org.cursillo.commons.dto.Rol rolDto, String nombre, Pageable pageable) {
+        boolean filtrarPorNombre = nombre != null && !nombre.isBlank();
+        log.debug("Listando usuarios activos con paginacion. Filtro rol: {}, nombre: {}", rolDto, nombre);
 
         if (rolDto != null) {
             Class<? extends Usuario> tipo = switch (rolDto) {
@@ -121,10 +123,18 @@ public class UsuarioService {
                 case SECRETARIA -> Secretaria.class;
             };
 
+            if (filtrarPorNombre) {
+                return usuarioRepo.findByNombreContainingIgnoreCaseAndActivoTrueAndTipo(nombre.trim(), tipo, pageable)
+                        .map(usuarioMapper::toDto);
+            }
             return usuarioRepo.findAllByActivoTrueAndTipo(tipo, pageable)
                     .map(usuarioMapper::toDto);
         }
 
+        if (filtrarPorNombre) {
+            return usuarioRepo.findByNombreContainingIgnoreCaseAndActivoTrue(nombre.trim(), pageable)
+                    .map(usuarioMapper::toDto);
+        }
         return usuarioRepo.findAllByActivoTrue(pageable).map(usuarioMapper::toDto);
     }
     
