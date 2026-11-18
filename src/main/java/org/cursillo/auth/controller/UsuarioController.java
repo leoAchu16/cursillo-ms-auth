@@ -45,10 +45,12 @@ public class UsuarioController {
 
     @PreAuthorize("hasAnyRole('SECRETARIA', 'PROFESOR', 'ALUMNO')")
     @GetMapping
-    public ResponseEntity<Page<UsuarioResponseDTO>> getAll(@RequestParam(value = "rol", required = false) Rol rol, @ParameterObject Pageable pageable) {
+    public ResponseEntity<Page<UsuarioResponseDTO>> getAll(@RequestParam(value = "rol", required = false) Rol rol,
+                                                           @RequestParam(value = "nombre", required = false) String nombre,
+                                                           @ParameterObject Pageable pageable) {
         log.info("GET /usuarios - listando usuarios (pagina: {}, tamanho: {})",
                 pageable.getPageNumber(), pageable.getPageSize());
-        return ResponseEntity.ok(service.listarUsuarios(rol, pageable));
+        return ResponseEntity.ok(service.listarUsuarios(rol, nombre, pageable));
     }
 
     @PreAuthorize("hasRole('SECRETARIA')")
