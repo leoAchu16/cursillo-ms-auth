@@ -19,6 +19,9 @@ public interface UsuarioRepository extends JpaRepository<Usuario,Integer> {
 
     Page<Usuario> findAllByActivoTrue(Pageable pageable);
 
+    // esto busca usuarios activos por nombre con paginacion
+    Page<Usuario> findByNombreContainingIgnoreCaseAndActivoTrue(String nombre, Pageable pageable);
+
     @Query("""
             SELECT u
             FROM Usuario u
@@ -26,6 +29,20 @@ public interface UsuarioRepository extends JpaRepository<Usuario,Integer> {
               AND TYPE(u) = :tipo
             """)
     Page<Usuario> findAllByActivoTrueAndTipo(
+            @Param("tipo") Class<? extends Usuario> tipo,
+            Pageable pageable);
+
+    // esto busca usuarios activos de un tipo (rol) por nombre con paginacion.
+    // Se usa @Query porque TYPE(u) no se puede expresar con un método derivado.
+    @Query("""
+            SELECT u
+            FROM Usuario u
+            WHERE u.activo = true
+              AND TYPE(u) = :tipo
+              AND LOWER(u.nombre) LIKE LOWER(CONCAT('%', :nombre, '%'))
+            """)
+    Page<Usuario> findByNombreContainingIgnoreCaseAndActivoTrueAndTipo(
+            @Param("nombre") String nombre,
             @Param("tipo") Class<? extends Usuario> tipo,
             Pageable pageable);
 }
