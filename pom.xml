@@ -13,12 +13,19 @@
 	<artifactId>cursillo-ms-auth</artifactId>
 	<name>cursillo-ms-auth</name>
 	<description>cursillo-ms-auth</description>
+	<packaging>war</packaging>
 
 	<properties>
         <mapstruct.version>1.6.3</mapstruct.version>
 
 	</properties>
 	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-tomcat</artifactId>
+			<scope>provided</scope>
+		</dependency>
+
 
         <dependency>
             <groupId>org.mapstruct</groupId>
@@ -86,6 +93,7 @@
 
 
 	<build>
+		<finalName>cursillo-ms-auth</finalName>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
