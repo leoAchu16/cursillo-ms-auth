@@ -4,6 +4,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.cursillo.auth.service.UsuarioService;
+import org.cursillo.commons.dto.CambioContrasenhaRequestDTO;
+import org.cursillo.commons.dto.PerfilRequestDTO;
 import org.cursillo.commons.dto.Rol;
 import org.cursillo.commons.dto.UsuarioRequestDTO;
 import org.cursillo.commons.dto.UsuarioResponseDTO;
@@ -30,7 +32,31 @@ public class UsuarioController {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.crearProfesor(dto));
     }
 
-    @PreAuthorize("hasAnyRole('SECRETARIA', 'PROFESOR', 'ALUMNO')")
+    // ----------PERFIL DEL USUARIO LOGUEADO (cualquier rol)----------
+
+    @GetMapping("/me")
+    public ResponseEntity<UsuarioResponseDTO> getPerfil() {
+        log.info("GET /usuarios/me - obteniendo perfil");
+        return ResponseEntity.ok(service.obtenerPerfil());
+    }
+
+    @PutMapping("/me")
+    public ResponseEntity<UsuarioResponseDTO> updatePerfil(@RequestBody @Valid PerfilRequestDTO dto) {
+        log.info("PUT /usuarios/me - actualizando perfil");
+        return ResponseEntity.ok(service.actualizarPerfil(dto));
+    }
+
+    @PutMapping("/me/contrasenha")
+    public ResponseEntity<Void> updateContrasenha(@RequestBody @Valid CambioContrasenhaRequestDTO dto) {
+        log.info("PUT /usuarios/me/contrasenha - cambiando contraseña");
+        service.cambiarContrasenha(dto);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ----------GESTIÓN DE USUARIOS (secretaría)----------
+
+    // Solo secretaría: cada usuario edita lo suyo por /usuarios/me
+    @PreAuthorize("hasRole('SECRETARIA')")
     @PutMapping("/{id}")
     public ResponseEntity<UsuarioResponseDTO> update(@PathVariable("id") Integer idUsuario, @RequestBody @Valid UsuarioRequestDTO dto) {
         log.info("PUT /usuarios/{} - actualizando usuario", idUsuario);
