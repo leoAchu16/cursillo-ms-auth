@@ -31,6 +31,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/login", "/auth/register", "/error",
                                 "/swagger-ui/**", "/swagger-ui.html",  "/v3/api-docs", "/v3/api-docs/**").permitAll()
+                        // el perfil propio lo usa cualquier rol; va antes de la regla general
+                        .requestMatchers("/usuarios/me", "/usuarios/me/**").authenticated()
                         .requestMatchers("/usuarios/**").hasRole("SECRETARIA")
                         .anyRequest().authenticated())
                 .addFilterBefore(new JwtAuthenticationFilter(jwtService),
