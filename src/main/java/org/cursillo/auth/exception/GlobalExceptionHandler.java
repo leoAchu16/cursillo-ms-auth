@@ -6,6 +6,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.core.AuthenticationException;
 
 import java.time.LocalDateTime;
@@ -32,6 +34,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleBusiness(BusinessException ex) {
         log.warn("Error de logica de negocio: {}", ex.getMessage());
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<Map<String, Object>> handleBadCredentials(BadCredentialsException ex) {
+        log.warn("Credenciales incorrectas");
+        return buildResponse(HttpStatus.UNAUTHORIZED, "Email o contraseña incorrectos.");
+    }
+
+    // Falla al buscar el usuario (por ejemplo, la base de datos no responde): no es un error de credenciales
+    @ExceptionHandler(InternalAuthenticationServiceException.class)
+    public ResponseEntity<Map<String, Object>> handleInternalAuthentication(InternalAuthenticationServiceException ex) {
+        return handleGeneric(ex);
     }
 
     @ExceptionHandler(AuthenticationException.class)
