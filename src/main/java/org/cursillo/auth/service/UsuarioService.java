@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -34,6 +35,12 @@ import java.util.Set;
 public class UsuarioService {
 
     private static final int LARGO_MINIMO_CONTRASENHA = 8;
+    private static final int BYTES_MAXIMOS_CONTRASENHA = 72; // límite de BCrypt
+
+    // Largos de las columnas de la tabla usuarios
+    private static final int LARGO_MAXIMO_NOMBRE = 100;
+    private static final int LARGO_MAXIMO_EMAIL = 255;
+    private static final int LARGO_MAXIMO_TELEFONO = 20;
 
     private final UsuarioRepository usuarioRepo;
     private final UsuarioMapper usuarioMapper;
@@ -44,11 +51,15 @@ public class UsuarioService {
     @Transactional
     public UsuarioResponseDTO registrarAlumno(RegistroRequestDTO registro) {
         log.debug("Registro de alumno con email {}", registro.getEmail());
+        String telefono = limpiar(registro.getTelefono());
+        if (telefono == null || !telefono.matches("^\\+?\\d+$"))
+            throw new BadRequestException("El teléfono es obligatorio y solo puede tener números.");
+
         UsuarioRequestDTO dto = new UsuarioRequestDTO()
-                .nombre(registro.getNombre())
+                .nombre(limpiar(registro.getNombre()))
                 .email(registro.getEmail())
                 .contrasenha(registro.getContrasenha())
-                .telefono(registro.getTelefono())
+                .telefono(telefono)
                 .rol(org.cursillo.commons.dto.Rol.ALUMNO);
 
         return guardar(dto);
@@ -254,12 +265,31 @@ public class UsuarioService {
         if (dto.getRol() == null)
             throw new BadRequestException("El rol es obligatorio.");
 
+        validarLargo("nombre", dto.getNombre(), LARGO_MAXIMO_NOMBRE);
+        validarLargo("email", dto.getEmail().trim(), LARGO_MAXIMO_EMAIL);
+        validarLargo("teléfono", dto.getTelefono(), LARGO_MAXIMO_TELEFONO);
+
         boolean hayContrasenha = dto.getContrasenha() != null && !dto.getContrasenha().isBlank();
         if (contrasenhaObligatoria && !hayContrasenha)
             throw new BadRequestException("La contraseña es obligatoria.");
         if (hayContrasenha && dto.getContrasenha().length() < LARGO_MINIMO_CONTRASENHA)
             throw new BadRequestException(
                     "La contraseña debe tener al menos " + LARGO_MINIMO_CONTRASENHA + " caracteres.");
+        if (hayContrasenha
+                && dto.getContrasenha().getBytes(StandardCharsets.UTF_8).length > BYTES_MAXIMOS_CONTRASENHA)
+            throw new BadRequestException("La contraseña es demasiado larga.");
+    }
+
+    /**
+     * Valida que un dato entre en su columna de la base de datos.
+     */
+    private void validarLargo(String campo, String valor, int maximo) {
+        if (valor != null && valor.length() > maximo)
+            throw new BadRequestException("El " + campo + " no puede tener más de " + maximo + " caracteres.");
+    }
+
+    private String limpiar(String texto) {
+        return texto == null ? null : texto.trim();
     }
 
 
