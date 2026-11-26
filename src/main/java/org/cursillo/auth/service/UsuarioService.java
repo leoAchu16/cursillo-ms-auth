@@ -9,6 +9,8 @@ import org.cursillo.auth.exception.BusinessException;
 import org.cursillo.auth.exception.NotFoundException;
 import org.cursillo.auth.mapper.UsuarioMapper;
 import org.cursillo.auth.repository.UsuarioRepository;
+import org.cursillo.commons.dto.CambioContrasenhaRequestDTO;
+import org.cursillo.commons.dto.PerfilRequestDTO;
 import org.cursillo.commons.dto.RegistroRequestDTO;
 import org.cursillo.commons.dto.UsuarioRequestDTO;
 import org.cursillo.commons.dto.UsuarioResponseDTO;
@@ -106,12 +108,72 @@ public class UsuarioService {
         // Los roles adicionales solo los cambia la secretaria. Si no, un alumno podría
         // editarse a sí mismo y agregarse el rol PROFESOR: se ignoran los del body.
         if (esSecretaria) {
+            Set<Rol> adicionales = adicionalesSinRepetir(existente, temporal.getRolesAdicionales());
+            validarCombinable(existente.getRol(), adicionales);
             existente.getRolesAdicionales().clear();
-            existente.getRolesAdicionales()
-                    .addAll(adicionalesSinRepetir(existente, temporal.getRolesAdicionales()));
+            existente.getRolesAdicionales().addAll(adicionales);
         }
 
         return usuarioMapper.toDto(usuarioRepo.save(existente));
+    }
+
+    // ----------PERFIL DEL USUARIO LOGUEADO----------
+
+    /**
+     * Datos del usuario logueado (GET /usuarios/me).
+     */
+    @Transactional(readOnly = true)
+    public UsuarioResponseDTO obtenerPerfil() {
+        return usuarioMapper.toDto(usuarioLogueado());
+    }
+
+    /**
+     * El usuario logueado edita su nombre y su teléfono. El email, el rol y la
+     * contraseña no se tocan acá (la contraseña tiene su propio endpoint).
+     */
+    @Transactional
+    public UsuarioResponseDTO actualizarPerfil(PerfilRequestDTO dto) {
+        Usuario usuario = usuarioLogueado();
+        log.debug("Usuario {} actualizando su perfil", usuario.getIdUsuario());
+
+        String nombre = limpiar(dto.getNombre());
+        String telefono = limpiar(dto.getTelefono());
+        if (nombre == null || nombre.isBlank())
+            throw new BadRequestException("El nombre es obligatorio.");
+        if (telefono == null || !telefono.matches("^\\+?\\d+$"))
+            throw new BadRequestException("El teléfono es obligatorio y solo puede tener números.");
+        validarLargo("nombre", nombre, LARGO_MAXIMO_NOMBRE);
+        validarLargo("teléfono", telefono, LARGO_MAXIMO_TELEFONO);
+
+        usuario.setNombre(nombre);
+        usuario.setTelefono(telefono);
+        return usuarioMapper.toDto(usuarioRepo.save(usuario));
+    }
+
+    /**
+     * El usuario logueado cambia su contraseña. Exige la actual, para que una sesión
+     * abierta o un token robado no alcancen para quedarse con la cuenta.
+     */
+    @Transactional
+    public void cambiarContrasenha(CambioContrasenhaRequestDTO dto) {
+        Usuario usuario = usuarioLogueado();
+        log.debug("Usuario {} cambiando su contraseña", usuario.getIdUsuario());
+
+        String actual = dto.getContrasenhaActual();
+        String nueva = dto.getContrasenhaNueva();
+        if (actual == null || actual.isBlank())
+            throw new BadRequestException("La contraseña actual es obligatoria.");
+        if (nueva == null || nueva.isBlank())
+            throw new BadRequestException("La contraseña nueva es obligatoria.");
+        // 400 y no 401: es un dato mal cargado, la sesión sigue siendo válida
+        if (!passwordEncoder.matches(actual, usuario.getContrasenha()))
+            throw new BadRequestException("La contraseña actual no es correcta.");
+        validarContrasenha(nueva);
+        if (nueva.equals(actual))
+            throw new BadRequestException("La contraseña nueva tiene que ser distinta de la actual.");
+
+        usuario.setContrasenha(passwordEncoder.encode(nueva));
+        usuarioRepo.save(usuario);
     }
 
     /**
@@ -192,6 +254,7 @@ public class UsuarioService {
 
         if (usuario.getRol() == rol)
             throw new BusinessException("Ese ya es el rol principal del usuario.");
+        validarCombinable(usuario.getRol(), Set.of(rol));
         if (!usuario.getRolesAdicionales().add(rol))
             throw new BusinessException("El usuario ya tiene ese rol.");
 
@@ -230,6 +293,14 @@ public class UsuarioService {
     private void validarRolAsignable(Rol rol) {
         if (rol == Rol.SECRETARIA)
             throw new BadRequestException("No se puede asignar este rol.");
+    }
+
+    /**
+     * La única combinación de roles es profesor + alumno: la secretaría no suma otros roles.
+     */
+    private void validarCombinable(Rol principal, Set<Rol> adicionales) {
+        if (principal == Rol.SECRETARIA && !adicionales.isEmpty())
+            throw new BadRequestException("Una secretaria no puede tener otros roles.");
     }
 
     /**
@@ -272,12 +343,28 @@ public class UsuarioService {
         boolean hayContrasenha = dto.getContrasenha() != null && !dto.getContrasenha().isBlank();
         if (contrasenhaObligatoria && !hayContrasenha)
             throw new BadRequestException("La contraseña es obligatoria.");
-        if (hayContrasenha && dto.getContrasenha().length() < LARGO_MINIMO_CONTRASENHA)
+        if (hayContrasenha) validarContrasenha(dto.getContrasenha());
+    }
+
+    /**
+     * Valida el largo de una contraseña: mínimo de caracteres y máximo de bytes que admite BCrypt.
+     */
+    private void validarContrasenha(String contrasenha) {
+        if (contrasenha.length() < LARGO_MINIMO_CONTRASENHA)
             throw new BadRequestException(
                     "La contraseña debe tener al menos " + LARGO_MINIMO_CONTRASENHA + " caracteres.");
-        if (hayContrasenha
-                && dto.getContrasenha().getBytes(StandardCharsets.UTF_8).length > BYTES_MAXIMOS_CONTRASENHA)
+        if (contrasenha.getBytes(StandardCharsets.UTF_8).length > BYTES_MAXIMOS_CONTRASENHA)
             throw new BadRequestException("La contraseña es demasiado larga.");
+    }
+
+    /**
+     * Usuario activo que hizo la petición, según el id del token.
+     */
+    private Usuario usuarioLogueado() {
+        Integer id = usuarioActual.id();
+        if (id == null) throw new AccessDeniedException("No hay un usuario autenticado.");
+        return usuarioRepo.findByIdUsuarioAndActivoTrue(id)
+                .orElseThrow(() -> new NotFoundException("Usuario no encontrado. Id: " + id));
     }
 
     /**
